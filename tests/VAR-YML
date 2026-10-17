@@ -1,0 +1,111 @@
+```javascript
+// ============================================================
+// YAML GITHUB ACTIONS
+// ============================================================
+
+async function genererYaml(){
+var prompt = document.getElementById('yaml-prompt').value.trim();
+var lignes = parseInt(document.getElementById('yaml-lignes').value) || 1000;
+if(!prompt){ alert('Prompt requis'); return; }
+document.getElementById('yaml-result-panel').style.display = 'block';
+document.getElementById('yaml-stats').innerHTML = '<div class="loader"><div class="spinner"></div><div>Génération YAML...</div></div>';
+document.getElementById('yaml-details').innerHTML = '';
+try {
+var d = await post('/api/yaml/generate', {prompt: prompt, lignes: lignes});
+var h = '<div class="stat"><div class="stat-lbl">Catégorie</div><div class="stat-val">' + esc(d.category) + '</div></div>';
+h += '<div class="stat"><div class="stat-lbl">Lignes</div><div class="stat-val ok">' + (d.lignes||0) + '</div></div>';
+h += '<div class="stat"><div class="stat-lbl">Taille</div><div class="stat-val">' + ((d.octets||0)/1024).toFixed(1) + ' Ko</div></div>';
+document.getElementById('yaml-stats').innerHTML = h;
+document.getElementById('yaml-output').textContent = d.code || '';
+window.__yaml = d.code || '';
+} catch(e) {
+document.getElementById('yaml-stats').innerHTML = '<div class="result">Erreur: ' + esc(e.message) + '</div>';
+}
+}
+
+async function chargerCategories(){
+var r = await fetch('/api/yaml/categories');
+var d = await r.json();
+var h = '';
+for (var k in d.categories) {
+h += '<div class="step"><b>' + esc(k).toUpperCase() + '</b> : ' + d.categories[k].join(', ') + '</div>';
+}
+document.getElementById('yaml-result-panel').style.display = 'block';
+document.getElementById('yaml-details').innerHTML = h;
+}
+
+async function validerYaml(){
+var yaml = document.getElementById('yaml-input').value.trim();
+if(!yaml){ alert('YAML requis'); return; }
+document.getElementById('yaml-result-panel').style.display = 'block';
+document.getElementById('yaml-stats').innerHTML = '<div class="loader"><div class="spinner"></div><div>Validation...</div></div>';
+try {
+var d = await post('/api/yaml/validate', {yaml: yaml});
+afficherYamlResult(d);
+} catch(e) {
+document.getElementById('yaml-stats').innerHTML = '<div class="result">Erreur: ' + esc(e.message) + '</div>';
+}
+}
+
+async function optimiserYaml(){
+var yaml = document.getElementById('yaml-input').value.trim();
+if(!yaml){ alert('YAML requis'); return; }
+document.getElementById('yaml-result-panel').style.display = 'block';
+document.getElementById('yaml-stats').innerHTML = '<div class="loader"><div class="spinner"></div><div>Optimisation...</div></div>';
+try {
+var d = await post('/api/yaml/optimize', {yaml: yaml});
+afficherYamlOptim(d);
+} catch(e) {
+document.getElementById('yaml-stats').innerHTML = '<div class="result">Erreur: ' + esc(e.message) + '</div>';
+}
+}
+
+async function validerEtOptimiser(){
+var yaml = document.getElementById('yaml-input').value.trim();
+if(!yaml){ alert('YAML requis'); return; }
+document.getElementById('yaml-result-panel').style.display = 'block';
+document.getElementById('yaml-stats').innerHTML = '<div class="loader"><div class="spinner"></div><div>Validation + optimisation...</div></div>';
+try {
+var v = await post('/api/yaml/validate', {yaml: yaml});
+var o = await post('/api/yaml/optimize', {yaml: yaml});
+afficherYamlResult(v);
+afficherYamlOptim(o, false);
+} catch(e) {
+document.getElementById('yaml-stats').innerHTML = '<div class="result">Erreur: ' + esc(e.message) + '</div>';
+}
+}
+
+function afficherYamlResult(d){
+var h = '<div class="stat"><div class="stat-lbl">Verdict</div><div class="stat-val ' + (d.ok?'ok':'warn') + '">' + esc(d.verdict||'?') + '</div></div>';
+h += '<div class="stat"><div class="stat-lbl">Score</div><div class="stat-val">' + (d.score||0) + '/100</div></div>';
+h += '<div class="stat"><div class="stat-lbl">Erreurs</div><div class="stat-val ' + (d.errors?.length?'warn':'ok') + '">' + (d.errors?.length||0) + '</div></div>';
+h += '<div class="stat"><div class="stat-lbl">Warnings</div><div class="stat-val">' + (d.warnings?.length||0) + '</div></div>';
+document.getElementById('yaml-stats').innerHTML = h;
+var dh = '<h3 style="color:#00d4ff;font-size:11px;margin:12px 0 8px">🔍 Détails</h3>';
+(d.errors||[]).forEach(e => {
+dh += '<div class="verify-item verify-fail">❌ [' + esc(e.code) + '] ' + esc(e.msg) + '</div>';
+});
+(d.warnings||[]).forEach(w => {
+dh += '<div class="verify-item verify-note">⚠️ [' + esc(w.code) + '] ' + esc(w.msg) + '</div>';
+});
+(d.info||[]).forEach(i => {
+dh += '<div class="verify-item verify-ok">✅ [' + esc(i.code) + '] ' + esc(i.msg) + '</div>';
+});
+document.getElementById('yaml-details').innerHTML = dh;
+}
+
+function afficherYamlOptim(d, replace=true){
+var h = '<div class="stat"><div class="stat-lbl">Score avant</div><div class="stat-val">' + (d.score_before||0) + '</div></div>';
+h += '<div class="stat"><div class="stat-lbl">Score après</div><div class="stat-val ok">' + (d.score_after||0) + '</div></div>';
+h += '<div class="stat"><div class="stat-lbl">Optimisations</div><div class="stat-val ok">' + (d.optimizations?.length||0) + '</div></div>';
+if(replace) document.getElementById('yaml-stats').innerHTML = h;
+else document.getElementById('yaml-stats').innerHTML += h;
+var dh = '<h3 style="color:#00ff88;font-size:11px;margin:12px 0 8px">🚀 Optimisations</h3>';
+(d.optimizations||[]).forEach(o => {
+var cls = o.priority === 'CRITICAL' ? 'verify-fail' : o.priority === 'HIGH' ? 'verify-note' : 'verify-ok';
+dh += '<div class="verify-item ' + cls + '"><b>[' + esc(o.priority) + '] ' + esc(o.type) + '</b> — ' + esc(o.msg) + '<br><span style="color:#a0b8d0">💡 ' + esc(o.fix) + '</span><br><span style="color:#00ff88">📈 ' + esc(o.gain) + '</span></div>';
+});
+if(replace) document.getElementById('yaml-details').innerHTML = dh;
+else document.getElementById('yaml-details').innerHTML += dh;
+}
+```
