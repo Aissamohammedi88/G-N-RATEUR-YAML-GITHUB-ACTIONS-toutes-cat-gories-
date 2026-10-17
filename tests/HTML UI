@@ -1,0 +1,34 @@
+```html
+<div class="panel">
+<h2>🎯 GÉNÉRATEUR YAML GITHUB ACTIONS</h2>
+<div class="form-group"><label>Catégorie / Description</label>
+<input id="yaml-prompt" value="CI/CD Pipeline avec tests et deploy"></div>
+<div class="form-group"><label>Nombre de lignes cible</label>
+<input id="yaml-lignes" type="number" value="1000" min="100" max="5000"></div>
+<button class="btn massif" onclick="genererYaml()">⚡ GÉNÉRER YAML</button>
+<button class="btn sec" onclick="chargerCategories()">📋 CATÉGORIES</button>
+</div>
+
+<div class="panel">
+<h2>🔍 VALIDER / OPTIMISER UN YAML</h2>
+<div class="form-group"><label>YAML à analyser (colle ton workflow)</label>
+<textarea id="yaml-input" style="min-height:200px;width:100%;padding:12px;background:rgba(0,0,0,0.6);border:1px solid #1a3a5a;border-radius:9px;color:#c8e0f8;font-family:ui-monospace,monospace;font-size:11px" placeholder="name: CI
+on: push
+jobs:
+build:
+runs-on: ubuntu-latest
+steps:
+- uses: actions/checkout@v2
+- run: npm test"></textarea></div>
+<button class="btn verify" onclick="validerYaml()">🔬 VALIDER</button>
+<button class="btn massif" onclick="optimiserYaml()">🚀 OPTIMISER</button>
+<button class="btn sec" onclick="validerEtOptimiser()">🎯 TOUT</button>
+</div>
+
+<div class="panel" id="yaml-result-panel" style="display:none">
+<h2>Résultats YAML</h2>
+<div class="grid" id="yaml-stats"></div>
+<div id="yaml-details"></div>
+<div class="result" id="yaml-output"></div>
+</div>
+```
