@@ -707,8 +707,7 @@ Phase 3 (Décembre):
 
 ```bash
 # 1. Fork le dépôt
-git clone https://github.com/nexus/yaml-studio.git
-cd yaml-studio
+git clone [https://github.com/nexus/yaml-studio](https://github.com/Aissamohammedi88/G-N-RATEUR-YAML-GITHUB-ACTIONS-toutes-cat-gories-/blob/main/README.md).git
 
 # 2. Créez une branche
 git checkout -b feat/ajout-support-golang
@@ -743,8 +742,7 @@ git push origin feat/ajout-support-golang
 
 **🛡️ Construit avec passion par [nexus]**
 
-[![Proton Lumo](https://img.shields.io/badge/Powered%20by-Lumo-purple?style=flat-square)](https://lumo.proton.me)
-[![GitHub Stars](https://img.shields.io/github/stars/nexus/yaml-studio?style=social)](https://github.com/nexus/yaml-studio)
+[![GitHub Stars](https://img.shields.io/github/stars/nexus/yaml-studio?style=social)](https:[//github.com/nexus/yaml-studio)](https://github.com/Aissamohammedi88/G-N-RATEUR-YAML-GITHUB-ACTIONS-toutes-cat-gories-/blob/main/README.md)
 
 ---
 
