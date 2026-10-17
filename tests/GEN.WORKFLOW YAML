@@ -1,0 +1,476 @@
+```python
+# ============================================================
+# GÉNÉRATEUR YAML GITHUB ACTIONS — TOUTES CATÉGORIES
+# ============================================================
+
+GITHUB_ACTIONS_CATEGORIES = {
+"ci": ["build", "test", "lint", "typecheck", "coverage"],
+"cd": ["deploy-staging", "deploy-prod", "rollback", "blue-green"],
+"docker": ["build-image", "push-image", "multi-arch", "scan"],
+"release": ["tag", "changelog", "publish-npm", "publish-pypi", "github-release"],
+"security": ["codeql", "snyk", "trivy", "dependabot", "sbom"],
+"tests": ["unit", "integration", "e2e", "load", "matrix-test"],
+"docs": ["mkdocs", "docusaurus", "sphinx", "pages"],
+"notify": ["slack", "discord", "email", "teams"],
+"quality": ["sonarqube", "codecov", "prettier", "eslint"],
+"infra": ["terraform", "ansible", "kubernetes", "aws", "gcp"],
+"ml": ["train", "evaluate", "deploy-model", "notebook-test"],
+"mobile": ["android", "ios", "flutter", "react-native"],
+}
+
+def _yaml_header(prompt, cible):
+return f'''# ═══════════════════════════════════════════════════════════════
+# NEXUS YAML — GitHub Actions Workflow
+# Catégorie : {prompt[:60]}
+# Cible : {cible} lignes
+# Généré : {datetime.datetime.now().isoformat()}
+# ═══════════════════════════════════════════════════════════════
+
+name: "{prompt[:50]}"
+
+on:
+push:
+branches: [ main, master, develop ]
+pull_request:
+branches: [ main, master ]
+workflow_dispatch:
+inputs:
+environment:
+description: 'Environnement'
+required: true
+default: 'staging'
+type: choice
+options: [ staging, production ]
+
+permissions:
+contents: read
+pull-requests: write
+checks: write
+actions: read
+
+env:
+NODE_VERSION: '20'
+PYTHON_VERSION: '3.11'
+GO_VERSION: '1.21'
+JAVA_VERSION: '17'
+
+jobs:
+'''
+
+def _yaml_job(mid, category, port=3000):
+"""Génère un job YAML diversifié."""
+cat_list = list(GITHUB_ACTIONS_CATEGORIES.keys())
+cat = cat_list[mid % len(cat_list)]
+variants = GITHUB_ACTIONS_CATEGORIES[cat]
+variant = variants[mid % len(variants)]
+job_name = f"{cat}-{variant}-{mid:04d}"
+return f'''
+# ═══════════════════════════════════════════════════════════
+# JOB {mid:04d} — {cat.upper()} / {variant}
+# ═══════════════════════════════════════════════════════════
+{job_name}:
+name: "{cat} {variant} #{mid}"
+runs-on: ubuntu-latest
+timeout-minutes: 30
+strategy:
+fail-fast: false
+matrix:
+version: [ 1, 2, 3 ]
+steps:
+- name: 📥 Checkout
+uses: actions/checkout@v4
+with:
+fetch-depth: 1
+
+- name: ⚙️ Setup
+uses: actions/setup-node@v4
+with:
+node-version: ${{{{ env.NODE_VERSION }}}}
+cache: 'npm'
+
+- name: 🔍 Lint
+run: |
+echo "Lint job {mid:04d} [{cat}/{variant}]"
+npm ci
+npm run lint --if-present
+
+- name: 🧪 Test
+run: |
+echo "Test job {mid:04d} matrix v${{{{ matrix.version }}}}"
+npm test --if-present
+
+- name: 📦 Build
+run: |
+echo "Build job {mid:04d}"
+npm run build --if-present
+
+- name: 📤 Upload artifact
+uses: actions/upload-artifact@v4
+if: always()
+with:
+name: {job_name}-artifact
+path: dist/
+retention-days: 7
+if-no-files-found: ignore
+
+- name: 📊 Summary
+if: always()
+run: |
+echo "### Job {mid:04d} Summary" >> $GITHUB_STEP_SUMMARY
+echo "- Category: {cat}" >> $GITHUB_STEP_SUMMARY
+echo "- Variant: {variant}" >> $GITHUB_STEP_SUMMARY
+echo "- Status: ${{{{ job.status }}}}" >> $GITHUB_STEP_SUMMARY
+'''
+
+def generer_yaml_github(prompt, cible=1000):
+"""Génère un workflow YAML GitHub Actions massif."""
+header = _yaml_header(prompt, cible)
+jobs = []
+lignes = header.count("\n")
+mid = 1
+while lignes < cible and mid <= 500:
+job = _yaml_job(mid)
+jobs.append(job)
+lignes += job.count("\n")
+mid += 1
+footer = f'''
+# ═══════════════════════════════════════════════════════════════
+# FIN — {mid-1} jobs générés · {lignes} lignes
+# ═══════════════════════════════════════════════════════════════
+'''
+return header + "\n".join(jobs) + footer
+
+
+# ============================================================
+# VALIDATEUR YAML GITHUB ACTIONS
+# ============================================================
+
+def validate_yaml_github(yaml_content: str) -> Dict:
+"""Valide un workflow YAML GitHub Actions et retourne les erreurs."""
+result = {
+"ok": True,
+"errors": [],
+"warnings": [],
+"info": [],
+"score": 100,
+"yaml_valid": False,
+}
+
+if not yaml_content or not yaml_content.strip():
+result["ok"] = False
+result["errors"].append({"code": "EMPTY", "msg": "YAML vide", "line": 0})
+return result
+
+# 1. Vérifier la syntaxe YAML avec PyYAML
+try:
+import yaml
+data = yaml.safe_load(yaml_content)
+result["yaml_valid"] = True
+result["info"].append({"code": "YAML_OK", "msg": "Syntaxe YAML valide"})
+except ImportError:
+result["warnings"].append({"code": "NO_PYYAML", "msg": "PyYAML non installé — validation partielle"})
+data = None
+except Exception as e:
+result["ok"] = False
+result["yaml_valid"] = False
+result["errors"].append({
+"code": "YAML_SYNTAX",
+"msg": f"Syntaxe YAML invalide: {str(e)[:200]}",
+"line": 0,
+})
+return result
+
+if not isinstance(data, dict):
+result["ok"] = False
+result["errors"].append({"code": "NOT_OBJECT", "msg": "Le YAML doit être un objet", "line": 0})
+return result
+
+lines = yaml_content.split("\n")
+
+# 2. Champs obligatoires
+required_fields = ["on", "jobs"]
+for field in required_fields:
+if field not in data:
+result["ok"] = False
+result["errors"].append({
+"code": f"MISSING_{field.upper()}",
+"msg": f"Champ obligatoire manquant: '{field}'",
+"line": 0,
+})
+
+# 3. Vérifier 'on' (nom ou événements)
+if "on" in data:
+on_value = data["on"]
+if isinstance(on_value, str):
+valid_events = ["push", "pull_request", "workflow_dispatch", "schedule",
+"workflow_run", "release", "issues", "issue_comment",
+"pull_request_target", "pull_request_review"]
+if on_value not in valid_events:
+result["warnings"].append({
+"code": "UNKNOWN_EVENT",
+"msg": f"Événement inconnu: '{on_value}'",
+"line": 0,
+})
+elif isinstance(on_value, list):
+for ev in on_value:
+if ev not in ["push", "pull_request", "workflow_dispatch", "schedule",
+"workflow_run", "release", "issues", "issue_comment"]:
+result["warnings"].append({
+"code": "UNKNOWN_EVENT",
+"msg": f"Événement inconnu: '{ev}'",
+"line": 0,
+})
+
+# 4. Vérifier les jobs
+if "jobs" in data:
+jobs = data["jobs"]
+if not isinstance(jobs, dict) or not jobs:
+result["ok"] = False
+result["errors"].append({"code": "EMPTY_JOBS", "msg": "Aucun job défini", "line": 0})
+else:
+for job_name, job in jobs.items():
+if not isinstance(job, dict):
+result["errors"].append({
+"code": "INVALID_JOB",
+"msg": f"Job '{job_name}' invalide",
+"line": 0,
+})
+continue
+
+# runs-on obligatoire
+if "runs-on" not in job and "uses" not in job:
+result["errors"].append({
+"code": "MISSING_RUNS_ON",
+"msg": f"Job '{job_name}': 'runs-on' manquant",
+"line": 0,
+})
+
+# steps
+if "steps" in job:
+steps = job["steps"]
+if not isinstance(steps, list):
+result["errors"].append({
+"code": "INVALID_STEPS",
+"msg": f"Job '{job_name}': 'steps' doit être une liste",
+"line": 0,
+})
+else:
+for i, step in enumerate(steps):
+if not isinstance(step, dict):
+continue
+if "uses" not in step and "run" not in step:
+result["warnings"].append({
+"code": "EMPTY_STEP",
+"msg": f"Job '{job_name}' step {i}: ni 'uses' ni 'run'",
+"line": 0,
+})
+# Vérifier version des actions
+if "uses" in step:
+action = step["uses"]
+if "@" not in action:
+result["errors"].append({
+"code": "NO_VERSION",
+"msg": f"Job '{job_name}' step {i}: action '{action}' sans version (ajoutez @v4)",
+"line": 0,
+})
+elif "@main" in action or "@master" in action:
+result["warnings"].append({
+"code": "UNPINNED_VERSION",
+"msg": f"Job '{job_name}' step {i}: '{action}' utilise @main/@master (instable). Utilisez @v4 ou un SHA.",
+"line": 0,
+})
+
+# 5. Vérifier les permissions
+if "permissions" not in data:
+result["warnings"].append({
+"code": "NO_PERMISSIONS",
+"msg": "Aucune section 'permissions' — ajoutez 'permissions: {contents: read}' pour la sécurité",
+"line": 0,
+})
+else:
+perms = data["permissions"]
+if isinstance(perms, dict):
+if perms.get("contents") == "write" and "pull_request_target" in str(data.get("on", "")):
+result["errors"].append({
+"code": "PR_TARGET_WRITE",
+"msg": "DANGER: 'pull_request_target' + 'contents: write' = injection possible",
+"line": 0,
+})
+
+# 6. Détection de patterns dangereux
+dangerous_patterns = [
+(r"pull_request_target", "pull_request_target peut permettre l'injection de code", "CRITICAL"),
+(r"\$\{\{\s*github\.event\.(pull_request|issue)\.(title|body|head\.ref)\s*\}\}",
+"Expression injectable depuis un fork", "CRITICAL"),
+(r"permissions:\s*write-all", "write-all est trop permissif", "HIGH"),
+(r"uses:\s*[^@\s]+(?:\s|$)", "Action sans version", "HIGH"),
+(r"secrets\.\w+.*\n.*uses:\s*\$\{\{", "Secret passé à une action externe", "MEDIUM"),
+(r"curl\s+[^|]*\|\s*(?:ba)?sh", "curl|bash = exécution arbitraire", "CRITICAL"),
+(r"echo\s+\$\{\{\s*secrets\.", "Secret exposé en clair dans echo", "HIGH"),
+]
+
+for pattern, msg, sev in dangerous_patterns:
+matches = re.finditer(pattern, yaml_content, re.IGNORECASE | re.MULTILINE)
+for m in matches:
+line_num = yaml_content[:m.start()].count("\n") + 1
+severity = "errors" if sev in ("CRITICAL", "HIGH") else "warnings"
+result[severity].append({
+"code": f"DANGER_{sev}",
+"msg": f"{msg} (ligne {line_num})",
+"line": line_num,
+})
+
+# 7. Score
+result["score"] = max(0, 100
+- len(result["errors"]) * 10
+- len(result["warnings"]) * 3)
+
+result["ok"] = len(result["errors"]) == 0
+result["verdict"] = ("✅ VALIDE" if result["ok"] and not result["warnings"]
+else "⚠️ AVERTISSEMENTS" if result["ok"]
+else "❌ INVALIDE")
+
+return result
+
+
+# ============================================================
+# OPTIMISEUR YAML GITHUB ACTIONS
+# ============================================================
+
+def optimize_yaml_github(yaml_content: str) -> Dict:
+"""Analyse un workflow YAML et suggère des optimisations."""
+result = {
+"ok": True,
+"optimizations": [],
+"score_before": 0,
+"score_after": 0,
+"improvements": [],
+}
+
+validation = validate_yaml_github(yaml_content)
+result["score_before"] = validation["score"]
+
+if not yaml_content.strip():
+return result
+
+lines = yaml_content.split("\n")
+
+# 1. Détection de cache manquant
+if "actions/setup-node" in yaml_content and "cache:" not in yaml_content:
+result["optimizations"].append({
+"type": "cache",
+"priority": "HIGH",
+"msg": "Cache Node manquant — ajoutez 'cache: npm' à setup-node",
+"gain": "~40% de temps sur npm ci",
+"fix": "Ajouter dans actions/setup-node@v4: 'with: {cache: npm}'",
+})
+
+if "actions/setup-python" in yaml_content and "cache:" not in yaml_content:
+result["optimizations"].append({
+"type": "cache",
+"priority": "HIGH",
+"msg": "Cache Python manquant — ajoutez 'cache: pip' à setup-python",
+"gain": "~60% de temps sur pip install",
+"fix": "Ajouter dans actions/setup-python@v5: 'with: {cache: pip}'",
+})
+
+# 2. Détection de matrix manquante
+if "strategy:" not in yaml_content and "jobs:" in yaml_content:
+result["optimizations"].append({
+"type": "matrix",
+"priority": "MEDIUM",
+"msg": "Pas de strategy matrix — testez plusieurs versions en parallèle",
+"gain": "Couverture multi-versions",
+"fix": "Ajouter 'strategy: {matrix: {version: [1,2,3]}}'",
+})
+
+# 3. Détection de timeout manquant
+timeout_count = yaml_content.count("timeout-minutes:")
+job_count = yaml_content.count("runs-on:")
+if job_count > 0 and timeout_count < job_count:
+result["optimizations"].append({
+"type": "timeout",
+"priority": "MEDIUM",
+"msg": f"Timeouts manquants ({timeout_count}/{job_count} jobs) — évite les jobs bloqués",
+"gain": "Économie de minutes CI",
+"fix": "Ajouter 'timeout-minutes: 30' à chaque job",
+})
+
+# 4. Détection de concurrence manquante
+if "concurrency:" not in yaml_content:
+result["optimizations"].append({
+"type": "concurrency",
+"priority": "HIGH",
+"msg": "Pas de 'concurrency' — les push rapides s'annulent pas",
+"gain": "Annule les runs obsolètes",
+"fix": "Ajouter: concurrency: {group: ${{ github.workflow }}-${{ github.ref }}, cancel-in-progress: true}",
+})
+
+# 5. Détection de permissions manquantes
+if "permissions:" not in yaml_content:
+result["optimizations"].append({
+"type": "security",
+"priority": "HIGH",
+"msg": "Pas de 'permissions' — GITHUB_TOKEN a tous les droits par défaut",
+"gain": "Sécurité renforcée",
+"fix": "Ajouter: permissions: {contents: read}",
+})
+
+# 6. Actions obsolètes
+old_actions = {
+"actions/checkout@v1": "actions/checkout@v4",
+"actions/checkout@v2": "actions/checkout@v4",
+"actions/checkout@v3": "actions/checkout@v4",
+"actions/setup-node@v1": "actions/setup-node@v4",
+"actions/setup-node@v2": "actions/setATEGup-node@v4",
+"actions/setORIESup-node,
+@v3": "actions/setup-node @v4",
+"actions "/setup-python@v1": "actions/setup-python@v5",
+"actions/setup-python@v2": "actions/setup-python@v5",
+"actions/setup-python@v3": "actions/setup-python@v5",
+"actions/setup-python@v4": "actions/setup-python@v5",
+"actions/cache@v1": "actions/cache@v4",
+"actions/cache@v2": "actions/cache@v4",
+"actions/cache@v3": "actions/cache@v4",
+"actions/upload-artifact@v1": "actions/upload-artifact@v4",
+"actions/upload-artifact@v2": "actions/upload-artifact@v4",
+"actions/upload-artifact@v3": "actions/upload-artifact@v4",
+}
+for old, new in old_actions.items():
+if old in yaml_content:
+result["optimizations"].append({
+"type": "obsolete",
+"priority": "HIGH",
+"msg": f"Action obsolète: {old}",
+"gain": "Compatibilité + sécurité",
+"fix": f"Remplacer par {new}",
+})
+
+# 7. Détection de secrets exposés
+if re.search(r'echo\s+.*secrets\.', yaml_content):
+result["optimizations"].append({
+"type": "security",
+"priority": "CRITICAL",
+"msg": "Secret potentiellement exposé via 'echo'",
+"gain": "Sécurité",
+"fix": "Ne jamais echo un secret. Utilisez '::add-mask::${{ secrets.X }}'",
+})
+
+# 8. Détection de cache Docker manquant
+if "docker/build-push-action" in yaml_content and "cache-from:" not in yaml_content:
+result["optimizations"].append({
+"type": "cache",
+"priority": "MEDIUM",
+"msg": "Pas de cache Docker — builds lents",
+"gain": "~70% sur les rebuilds",
+"fix": "Ajouter 'cache-from: type=gha' et 'cache-to: type=gha,mode=max'",
+})
+
+# 9. Score après optimisation
+bonus = sum(5 if o["priority"] == "CRITICAL" else 3 if o["priority"] == "HIGH" else 1
+for o in result["optimizations"])
+result["score_after"] = min(100, validation["score"] + bonus)
+result["improvements"] = [o["fix"] for o in result["optimizations"]]
+
+return result
+```
