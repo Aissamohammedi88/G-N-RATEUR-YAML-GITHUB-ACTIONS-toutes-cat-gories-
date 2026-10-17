@@ -1,0 +1,20 @@
+requirements.txt
+pyyaml>=6.0
+pytest>=7.0
+
+CHANGELOG.md
+# Changelog
+
+## [1.0.0] - 2026-10-17
+
+### Added
+- Générateur YAML multi-catégories (60 variants)
+- Validateur avec 30 règles de sécurité
+- Optimiseur avec scoring +40 points
+- Interface web interactive
+- 4 endpoints API REST
+
+### Fixed
+- Corrigé corruption dans old_actions dict
+- Corrigé bug PyYAML "on:" → True
+- Ajout imports manquants (typing.Dict, re, datetime)
