@@ -361,9 +361,16 @@ jobs:
             echo "❌ **Pipeline échoué. Vérifiez les logs ci-dessus.**" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
-
+          
       - name: Notification d'échec (Webhook)
-        if: failure()
+        if: failure()      - name: Vérification du formatage (Black)
+        run: black --check --diff . || true
+
+      - name: Vérification des imports (isort)
+        run: isort --check-only --diff . || true
+
+      - name: Vérification des types (Mypy)
+        run: mypy . --ignore-missing-imports || true
         run: |
           echo "::error::Le pipeline a échoué. Alerte envoyée à l'équipe."
           # curl -X POST -H 'Content-type: application/json' --data '{"text":"🚨 Nexus CI a échoué sur la branche ${{ github.ref_name }}"}' ${{ secrets.SLACK_WEBHOOK_URL }}
